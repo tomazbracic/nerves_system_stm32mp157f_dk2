@@ -23,6 +23,9 @@ it is not officially maintained by or affiliated with the
 
 ---
 
+[![STM32MP157F-DK2](https://www.st.com/bin/ecommerce/api/image.PF268548.en.feature-description-include-personalized-no-cpn-medium.jpg)](https://www.st.com/en/evaluation-tools/stm32mp157f-dk2.html)
+*Image source: [STMicroelectronics](https://www.st.com/en/evaluation-tools/stm32mp157f-dk2.html)*
+
 ## Hardware
 
 The STM32MP157F-DK2 is a development board from STMicroelectronics featuring:
