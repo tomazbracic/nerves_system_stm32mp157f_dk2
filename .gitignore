@@ -1,0 +1,12 @@
+# Build artifacts
+_build/
+deps/
+.nerves/
+
+# Firmware files (large binaries)
+*.fw
+*.tar.gz
+
+# Editor/IDE
+.elixir_ls/
+.vscode/

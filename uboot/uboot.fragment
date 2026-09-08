@@ -1,0 +1,59 @@
+# U-Boot config fragment for STM32MP157F-DK2 Nerves system
+#
+# Applied on top of stm32mp15_trusted_defconfig (U-Boot 2025.10).
+# Only overrides/additions needed for Nerves.
+
+# --------------------------------------------------------------------------
+# Console — ensure serial output is enabled for development
+# --------------------------------------------------------------------------
+# CONFIG_DISABLE_CONSOLE is not set
+# CONFIG_SILENT_CONSOLE is not set
+
+# --------------------------------------------------------------------------
+# Boot
+# --------------------------------------------------------------------------
+CONFIG_AUTOBOOT_KEYED=y
+CONFIG_AUTOBOOT_PROMPT="Press any key to stop autoboot: %d\n"
+CONFIG_BOOTDELAY=1
+
+# Smart boot command — compiled into U-Boot binary.
+# Handles A/B slot switching and boot-counting auto-revert.
+#
+# Logic:
+#   1. Check for failed boot (booted=1 + validated!=1) → revert to other slot
+#   2. Mark boot attempt (set booted=1, only writes on first boot after upgrade)
+#   3. Select rootfs partition based on nerves_fw_active (a→4, b→5)
+#   4. Load kernel + DTB from SquashFS, set bootargs, boot
+#
+# The x prefix trick handles undefined/empty variables safely:
+#   "test x${var} = x1" → "test x = x1" (false) instead of "test  = 1" (error)
+#
+# NOTE: Cannot set bootcmd via fwup because fwup evaluates ${} at compile time,
+# destroying U-Boot variable references. This must be in CONFIG_BOOTCOMMAND
+# (compiled into U-Boot) or set from Elixir via Nerves.Runtime.KV.put.
+CONFIG_USE_DEFAULT_ENV_FILE=n
+CONFIG_BOOTCOMMAND="if test x${nerves_fw_booted} = x1; then if test x${nerves_fw_validated} != x1; then echo Reverting firmware...; if test x${nerves_fw_active} = xb; then setenv nerves_fw_active a; else setenv nerves_fw_active b; fi; setenv nerves_fw_validated 1; setenv nerves_fw_booted 1; saveenv; fi; fi; if test x${nerves_fw_booted} != x1; then setenv nerves_fw_booted 1; saveenv; fi; if test x${nerves_fw_active} = xb; then setenv rootpart 5; else setenv rootpart 4; fi; sqfsload mmc 0:${rootpart} 0xc2000000 boot/zImage; sqfsload mmc 0:${rootpart} 0xc4000000 boot/stm32mp157c-dk2.dtb; setenv bootargs console=ttySTM0,115200 root=/dev/mmcblk0p${rootpart} rootfstype=squashfs rootwait loglevel=4; bootz 0xc2000000 - 0xc4000000"
+
+# SquashFS support for loading kernel from rootfs
+# CMD_SQUASHFS enables the command, FS_SQUASHFS enables the filesystem driver,
+# and LZ4 enables the decompressor (our rootfs uses LZ4 compression).
+CONFIG_CMD_SQUASHFS=y
+CONFIG_FS_SQUASHFS=y
+CONFIG_LZ4=y
+
+# --------------------------------------------------------------------------
+# U-Boot environment storage in MMC
+# --------------------------------------------------------------------------
+# ENV_IS_IN_MMC tells U-Boot to store env on the SD card.
+# ENV_MMC_EMMC_HW_PARTITION=0 selects hardware partition 0 (user area).
+# The STM32MP1 U-Boot device tree sets u-boot,mmc-env-partition = "fip"
+# which causes U-Boot to look for env in eMMC boot partition 2 — but the
+# DK2 has no eMMC, only an SD card (which only has hw partition 0).
+# ENV_MMC_USE_DT=n disables the device tree override so U-Boot uses our
+# config values instead.
+CONFIG_ENV_IS_IN_MMC=y
+CONFIG_ENV_SIZE=0x2000
+CONFIG_ENV_OFFSET=0x480000
+CONFIG_SYS_MMC_ENV_DEV=0
+CONFIG_ENV_MMC_EMMC_HW_PARTITION=0
+# CONFIG_ENV_MMC_USE_DT is not set
