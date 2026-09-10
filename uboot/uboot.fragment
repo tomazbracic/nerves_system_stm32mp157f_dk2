@@ -57,3 +57,12 @@ CONFIG_ENV_OFFSET=0x480000
 CONFIG_SYS_MMC_ENV_DEV=0
 CONFIG_ENV_MMC_EMMC_HW_PARTITION=0
 # CONFIG_ENV_MMC_USE_DT is not set
+# Disable redundant environment. The upstream stm32mp15_trusted_defconfig
+# enables CONFIG_ENV_REDUNDANT which adds a flags byte to the env header
+# (5-byte header instead of 4-byte). fwup and the UBootEnv Elixir library
+# expect the non-redundant 4-byte format. Without this override, U-Boot's
+# saveenv writes a 5-byte header that neither fwup nor UBootEnv can parse,
+# causing Nerves.Runtime.KV.get_all() to return %{} and breaking OTA.
+# Nerves handles A/B redundancy at the application level — U-Boot-level
+# env redundancy is unnecessary.
+# CONFIG_ENV_REDUNDANT is not set

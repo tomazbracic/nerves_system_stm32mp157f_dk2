@@ -51,7 +51,7 @@ The STM32MP157F-DK2 is a development board from STMicroelectronics featuring:
 | BLE | Kernel driver enabled | BRCMFMAC + HCI UART |
 | SSH | Working | Key auth via nerves_ssh |
 | mDNS | Working | `nerves-stm32mp1.local` |
-| OTA updates | Working* | Needs manual KV init after first boot (see Known Limitations) |
+| OTA updates | Working | A/B slot switching with fwup (v1.1.0+) |
 | Serial console | Working | `/dev/ttySTM0` via ST-LINK |
 | Display (DSI) | Kernel driver enabled | Needs Scenic/Surface config |
 | Touch (Goodix) | Kernel driver enabled | I2C on the DSI panel |
@@ -62,12 +62,10 @@ The STM32MP157F-DK2 is a development board from STMicroelectronics featuring:
 
 ## Known Limitations
 
-- **U-Boot environment format mismatch:** The fwup-written U-Boot environment and the UBootEnv Elixir library use incompatible serialization formats (likely CRC/header differences with U-Boot 2025.10). This causes two problems:
-  - `Nerves.Runtime.KV.get_all()` may return `%{}` after initial flash — the KV store appears empty even though fwup wrote values to it
-  - OTA uploads fail because `nerves_fw_devpath` is not readable
-  - **Workaround:** Set KV values manually from IEx after first boot (see OTA section above). Once set via the Elixir library, values persist correctly across reboots.
-  - Boot-counting auto-revert is also affected — manual revert via `Nerves.Runtime.revert()` works
 - **Toolchain:** Uses Bootlin GCC 14.3 instead of the standard Nerves toolchain. The Nerves GCC 13.2 toolchain produces U-Boot binaries that hang silently on STM32MP1.
+- **v1.0.0 users:** If you are on v1.0.0, the U-Boot environment KV store may be
+  empty due to a redundant env format mismatch. Upgrade to v1.1.0 which fixes this.
+  After upgrading, reflash with `mix burn` (not OTA) to get the fixed U-Boot binary.
 
 ## Prerequisites
 
@@ -110,7 +108,7 @@ defp deps do
   [
     # ... other deps ...
     {:nerves_system_stm32mp157f_dk2,
-     github: "tomazbracic/nerves_system_stm32mp157f_dk2", tag: "v1.0.0",
+     github: "tomazbracic/nerves_system_stm32mp157f_dk2", tag: "v1.1.0",
      runtime: false, targets: :stm32mp157f_dk2}
   ]
 end
@@ -198,26 +196,6 @@ mix firmware
 ```bash
 mix firmware.push nerves-stm32mp1.local --firmware _build/stm32mp157f_dk2_dev/nerves/images/my_firmware.fw
 ```
-
-> **Known issue:** OTA may fail on the very first boot after `mix burn` because
-> the U-Boot environment KV store can be empty (see Known Limitations below).
-> If `Nerves.Runtime.KV.get("nerves_fw_devpath")` returns `nil`, you need to
-> reflash with `mix burn` using a firmware that includes the KV initialization
-> workaround, or set the values manually from IEx:
->
-> ```elixir
-> Nerves.Runtime.KV.put("nerves_fw_devpath", "/dev/mmcblk0")
-> Nerves.Runtime.KV.put("nerves_fw_active", "a")
-> Nerves.Runtime.KV.put("nerves_fw_validated", "1")
-> Nerves.Runtime.KV.put("nerves_fw_booted", "0")
-> Nerves.Runtime.KV.put("a.nerves_fw_platform", "stm32mp157f_dk2")
-> Nerves.Runtime.KV.put("a.nerves_fw_architecture", "arm")
-> Nerves.Runtime.KV.put("a.nerves_fw_application_part0_devpath", "/dev/mmcblk0p6")
-> Nerves.Runtime.KV.put("a.nerves_fw_application_part0_fstype", "f2fs")
-> Nerves.Runtime.KV.put("a.nerves_fw_application_part0_target", "/root")
-> ```
->
-> After setting these, OTA will work. These values persist across reboots.
 
 ## Boot Chain
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.1.0
+
+Bug fix release.
+
+- **Fix:** Disable `CONFIG_ENV_REDUNDANT` in U-Boot. The upstream
+  `stm32mp15_trusted_defconfig` enables redundant environment which adds a
+  flags byte to the env header (5 bytes instead of 4). fwup and the UBootEnv
+  Elixir library expect the non-redundant 4-byte format. This mismatch caused
+  `Nerves.Runtime.KV.get_all()` to return `%{}` and broke OTA firmware updates.
+- **Docs:** Added OTA upload instructions, `@all_targets` setup guidance, and
+  KV store troubleshooting to README.
+
 ## v1.0.0
 
 Initial release.
