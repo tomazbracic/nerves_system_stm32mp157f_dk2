@@ -51,7 +51,7 @@ The STM32MP157F-DK2 is a development board from STMicroelectronics featuring:
 | BLE | Kernel driver enabled | BRCMFMAC + HCI UART |
 | SSH | Working | Key auth via nerves_ssh |
 | mDNS | Working | `nerves-stm32mp1.local` |
-| OTA updates | Working | A/B slot switching with fwup |
+| OTA updates | Working* | Needs manual KV init after first boot (see Known Limitations) |
 | Serial console | Working | `/dev/ttySTM0` via ST-LINK |
 | Display (DSI) | Kernel driver enabled | Needs Scenic/Surface config |
 | Touch (Goodix) | Kernel driver enabled | I2C on the DSI panel |
@@ -62,7 +62,11 @@ The STM32MP157F-DK2 is a development board from STMicroelectronics featuring:
 
 ## Known Limitations
 
-- **Boot-counting auto-revert:** U-Boot 2025.10 ignores the saved env's `bootcmd` (likely CRC/format mismatch with the UBootEnv Elixir library). Manual revert via `Nerves.Runtime.revert()` works. Tracked for investigation.
+- **U-Boot environment format mismatch:** The fwup-written U-Boot environment and the UBootEnv Elixir library use incompatible serialization formats (likely CRC/header differences with U-Boot 2025.10). This causes two problems:
+  - `Nerves.Runtime.KV.get_all()` may return `%{}` after initial flash — the KV store appears empty even though fwup wrote values to it
+  - OTA uploads fail because `nerves_fw_devpath` is not readable
+  - **Workaround:** Set KV values manually from IEx after first boot (see OTA section above). Once set via the Elixir library, values persist correctly across reboots.
+  - Boot-counting auto-revert is also affected — manual revert via `Nerves.Runtime.revert()` works
 - **Toolchain:** Uses Bootlin GCC 14.3 instead of the standard Nerves toolchain. The Nerves GCC 13.2 toolchain produces U-Boot binaries that hang silently on STM32MP1.
 
 ## Prerequisites
@@ -87,21 +91,34 @@ mix archive.install hex nerves_bootstrap
 ### 1. Create a new Nerves project
 
 ```bash
-mix nerves.new my_firmware --target stm32mp157f_dk2
+mix nerves.new my_firmware
 cd my_firmware
 ```
 
-Or add the system to an existing project's `mix.exs`:
+Then edit `mix.exs`:
+
+1. Add `:stm32mp157f_dk2` to the `@all_targets` list:
+
+```elixir
+@all_targets [:stm32mp157f_dk2]
+```
+
+2. Add the system dependency:
 
 ```elixir
 defp deps do
   [
+    # ... other deps ...
     {:nerves_system_stm32mp157f_dk2,
      github: "tomazbracic/nerves_system_stm32mp157f_dk2", tag: "v1.0.0",
      runtime: false, targets: :stm32mp157f_dk2}
   ]
 end
 ```
+
+> **Important:** Make sure `:stm32mp157f_dk2` is in `@all_targets`. Otherwise
+> dependencies like `nerves_pack` won't compile for this target and you'll get
+> a Shoehorn error at build time.
 
 ### 2. Set the target and fetch dependencies
 
@@ -146,6 +163,61 @@ ssh nerves-stm32mp1.local
 ```bash
 picocom -b 115200 /dev/ttyACM0
 ```
+
+## OTA Firmware Updates
+
+After the initial `mix burn`, you can push firmware updates over the network
+without physically touching the SD card.
+
+### Using mix upload (simple)
+
+```bash
+# Build updated firmware
+export MIX_TARGET=stm32mp157f_dk2
+mix firmware
+
+# Upload to the board (by hostname or IP)
+mix upload nerves-stm32mp1.local
+```
+
+### Using upload.sh (manual)
+
+```bash
+# Generate the upload script (one-time)
+mix firmware.gen.script
+
+# Build firmware
+mix firmware
+
+# Upload by IP address
+./upload.sh 192.168.1.225
+```
+
+### Using mix firmware.push (alternative)
+
+```bash
+mix firmware.push nerves-stm32mp1.local --firmware _build/stm32mp157f_dk2_dev/nerves/images/my_firmware.fw
+```
+
+> **Known issue:** OTA may fail on the very first boot after `mix burn` because
+> the U-Boot environment KV store can be empty (see Known Limitations below).
+> If `Nerves.Runtime.KV.get("nerves_fw_devpath")` returns `nil`, you need to
+> reflash with `mix burn` using a firmware that includes the KV initialization
+> workaround, or set the values manually from IEx:
+>
+> ```elixir
+> Nerves.Runtime.KV.put("nerves_fw_devpath", "/dev/mmcblk0")
+> Nerves.Runtime.KV.put("nerves_fw_active", "a")
+> Nerves.Runtime.KV.put("nerves_fw_validated", "1")
+> Nerves.Runtime.KV.put("nerves_fw_booted", "0")
+> Nerves.Runtime.KV.put("a.nerves_fw_platform", "stm32mp157f_dk2")
+> Nerves.Runtime.KV.put("a.nerves_fw_architecture", "arm")
+> Nerves.Runtime.KV.put("a.nerves_fw_application_part0_devpath", "/dev/mmcblk0p6")
+> Nerves.Runtime.KV.put("a.nerves_fw_application_part0_fstype", "f2fs")
+> Nerves.Runtime.KV.put("a.nerves_fw_application_part0_target", "/root")
+> ```
+>
+> After setting these, OTA will work. These values persist across reboots.
 
 ## Boot Chain
 
