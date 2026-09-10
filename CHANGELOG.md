@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.0
+
+- **Fix:** Enable `CONFIG_CGROUP_SCHED=y` in kernel config to suppress
+  `cgroup: Unknown subsys name 'cpu'` warning at boot.
+- **Fix:** Add `ELIXIR_ERL_OPTIONS=+fnu` to erlinit.config to enable UTF-8
+  filename encoding and suppress the latin1 warning from Elixir.
+
 ## v1.2.0
 
 - **Fix:** Write `bootcmd` to U-Boot environment during `mix burn` using a

@@ -51,7 +51,7 @@ The STM32MP157F-DK2 is a development board from STMicroelectronics featuring:
 | BLE | Kernel driver enabled | BRCMFMAC + HCI UART |
 | SSH | Working | Key auth via nerves_ssh |
 | mDNS | Working | `nerves-stm32mp1.local` |
-| OTA updates | Working | A/B slot switching with fwup (v1.2.0+) |
+| OTA updates | Working | A/B slot switching with fwup (v1.3.0+) |
 | Serial console | Working | `/dev/ttySTM0` via ST-LINK |
 | Display (DSI) | Kernel driver enabled | Needs Scenic/Surface config |
 | Touch (Goodix) | Kernel driver enabled | I2C on the DSI panel |
@@ -64,7 +64,7 @@ The STM32MP157F-DK2 is a development board from STMicroelectronics featuring:
 
 - **Toolchain:** Uses Bootlin GCC 14.3 instead of the standard Nerves toolchain. The Nerves GCC 13.2 toolchain produces U-Boot binaries that hang silently on STM32MP1.
 - **v1.0.0 users:** If you are on v1.0.0, the U-Boot environment KV store may be
-  empty due to a redundant env format mismatch. Upgrade to v1.2.0 which fixes this.
+  empty due to a redundant env format mismatch. Upgrade to v1.3.0 which fixes this.
   After upgrading, reflash with `mix burn` (not OTA) to get the fixed U-Boot binary.
 
 ## Prerequisites
@@ -108,7 +108,7 @@ defp deps do
   [
     # ... other deps ...
     {:nerves_system_stm32mp157f_dk2,
-     github: "tomazbracic/nerves_system_stm32mp157f_dk2", tag: "v1.2.0",
+     github: "tomazbracic/nerves_system_stm32mp157f_dk2", tag: "v1.3.0",
      runtime: false, targets: :stm32mp157f_dk2}
   ]
 end
