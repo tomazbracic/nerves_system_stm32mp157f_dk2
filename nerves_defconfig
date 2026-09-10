@@ -199,6 +199,9 @@ BR2_PACKAGE_LIBNL=y
 # Firmware Tools
 # --------------------------------------------------------------------------
 BR2_PACKAGE_HOST_FWUP=y
+# U-Boot host tools — provides mkenvimage for compiling the U-Boot
+# environment text file (uboot.env) into a binary (uboot-env.bin).
+BR2_PACKAGE_HOST_UBOOT_TOOLS=y
 
 # --------------------------------------------------------------------------
 # Nerves System Identification

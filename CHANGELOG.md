@@ -2,10 +2,12 @@
 
 ## v1.2.0
 
-- **Fix:** Write `bootcmd` to U-Boot environment during `mix burn`. Previously,
-  the saved env had no `bootcmd` so U-Boot dropped to a shell prompt instead of
-  auto-booting. Uses fwup's `\${}` escape syntax to write literal U-Boot variable
-  references (`${nerves_fw_active}`, etc.) without fwup evaluating them.
+- **Fix:** Write `bootcmd` to U-Boot environment during `mix burn` using a
+  pre-compiled env binary (mkenvimage). Previously, the saved env had no
+  `bootcmd` so U-Boot dropped to a shell prompt instead of auto-booting.
+  Uses the same approach as nerves_system_bbb — the env binary preserves
+  U-Boot `${variable}` references that fwup's libconfuse parser would
+  otherwise evaluate as empty host environment variables.
 - The BootcmdMigration workaround module is no longer needed in firmware apps.
 
 ## v1.1.0

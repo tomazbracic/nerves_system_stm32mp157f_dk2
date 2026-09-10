@@ -7,6 +7,9 @@ deps/
 *.fw
 *.tar.gz
 
+# Build logs
+*.log
+
 # Editor/IDE
 .elixir_ls/
 .vscode/
