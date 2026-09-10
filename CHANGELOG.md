@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.0
+
+- **Fix:** Write `bootcmd` to U-Boot environment during `mix burn`. Previously,
+  the saved env had no `bootcmd` so U-Boot dropped to a shell prompt instead of
+  auto-booting. Uses fwup's `\${}` escape syntax to write literal U-Boot variable
+  references (`${nerves_fw_active}`, etc.) without fwup evaluating them.
+- The BootcmdMigration workaround module is no longer needed in firmware apps.
+
 ## v1.1.0
 
 Bug fix release.
