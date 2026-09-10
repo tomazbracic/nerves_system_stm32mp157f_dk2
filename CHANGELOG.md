@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.0
+
+- **Feature:** Add Scenic UI support. Include cairo, freetype, libpng, and pixman
+  packages in the base system. scenic_driver_local v0.11+ uses cairo-fb for
+  software rendering on the DK2's 4-inch 480x800 DSI display — no GPU or mesa
+  needed. The kernel already has DRM/DSI/panel/touch/fbdev/evdev drivers enabled.
+  Just add `{:scenic, "~> 0.11"}` and `{:scenic_driver_local, "~> 0.11"}` to your
+  firmware app and build a UI.
+
 ## v1.3.0
 
 - **Fix:** Enable `CONFIG_CGROUP_SCHED=y` in kernel config to suppress

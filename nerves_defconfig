@@ -196,6 +196,21 @@ BR2_PACKAGE_LIBMNL=y
 BR2_PACKAGE_LIBNL=y
 
 # --------------------------------------------------------------------------
+# Graphics — Scenic UI support
+# --------------------------------------------------------------------------
+# scenic_driver_local v0.11+ uses cairo-fb for software rendering on the
+# framebuffer. No GPU/mesa/EGL needed — cairo renders in software which is
+# plenty fast for the DK2's 480x800 display on dual Cortex-A7.
+# The kernel already has DRM_STM, DRM_STM_DSI, the OTM8009A panel driver,
+# DRM_FBDEV_EMULATION (/dev/fb0), and TOUCHSCREEN_GOODIX + INPUT_EVDEV
+# enabled via multi_v7_defconfig defaults.
+BR2_PACKAGE_CAIRO=y
+BR2_PACKAGE_CAIRO_PNG=y
+BR2_PACKAGE_FREETYPE=y
+BR2_PACKAGE_LIBPNG=y
+BR2_PACKAGE_PIXMAN=y
+
+# --------------------------------------------------------------------------
 # Firmware Tools
 # --------------------------------------------------------------------------
 BR2_PACKAGE_HOST_FWUP=y

@@ -53,8 +53,8 @@ The STM32MP157F-DK2 is a development board from STMicroelectronics featuring:
 | mDNS | Working | `nerves-stm32mp1.local` |
 | OTA updates | Working | A/B slot switching with fwup (v1.3.0+) |
 | Serial console | Working | `/dev/ttySTM0` via ST-LINK |
-| Display (DSI) | Kernel driver enabled | Needs Scenic/Surface config |
-| Touch (Goodix) | Kernel driver enabled | I2C on the DSI panel |
+| Display (DSI) | Ready | 4" 480x800, Scenic via cairo-fb (v1.4.0+) |
+| Touch (Goodix) | Ready | Scenic input via `/dev/input/event*` (v1.4.0+) |
 | M4 remoteproc | Kernel driver enabled | Load firmware via `/sys/class/remoteproc/` |
 | RPMsg (A7-M4) | Kernel driver enabled | `/dev/rpmsg_ctrl0` |
 | USB host | Working | 4 ports |
@@ -108,7 +108,7 @@ defp deps do
   [
     # ... other deps ...
     {:nerves_system_stm32mp157f_dk2,
-     github: "tomazbracic/nerves_system_stm32mp157f_dk2", tag: "v1.3.0",
+     github: "tomazbracic/nerves_system_stm32mp157f_dk2", tag: "v1.4.0",
      runtime: false, targets: :stm32mp157f_dk2}
   ]
 end
@@ -197,6 +197,141 @@ mix firmware
 mix firmware.push nerves-stm32mp1.local --firmware _build/stm32mp157f_dk2_dev/nerves/images/my_firmware.fw
 ```
 
+## Upgrading to a New System Version
+
+When a new version of this system is released, you need to update the tag in
+your `mix.exs` and clear cached artifacts. Nerves caches downloaded system
+artifacts in `~/.nerves/dl/` and `~/.nerves/artifacts/` — stale caches cause
+checksum mismatches and confusing errors.
+
+```bash
+# 1. Update mix.exs: change tag: "v1.2.0" to tag: "v1.4.0" (or latest)
+
+# 2. Clear ALL cached system artifacts and stale build state
+rm -rf ~/.nerves/dl/nerves_system_stm32mp157f_dk2-*
+rm -rf ~/.nerves/artifacts/nerves_system_stm32mp157f_dk2-*
+rm -rf _build deps mix.lock
+
+# 3. Fetch fresh dependencies and build
+export MIX_TARGET=stm32mp157f_dk2
+mix deps.get
+mix firmware
+
+# 4. IMPORTANT: Use mix burn (not OTA) after a system upgrade.
+#    OTA does not update the bootloaders (TF-A, U-Boot).
+#    Only mix burn writes the full boot chain to the SD card.
+sudo umount /dev/sda*
+mix burn
+```
+
+## Troubleshooting
+
+### `Prebuilt nerves_system_stm32mp157f_dk2 not found` or checksum mismatch
+
+Stale cache. Clear everything:
+
+```bash
+rm -rf ~/.nerves/dl/nerves_system_stm32mp157f_dk2-*
+rm -rf ~/.nerves/artifacts/nerves_system_stm32mp157f_dk2-*
+rm -rf _build deps mix.lock
+mix deps.get
+```
+
+### `Shoehorn.ReleaseError: :nerves_pack is not a known OTP application`
+
+Your `@all_targets` list in `mix.exs` does not include `:stm32mp157f_dk2`.
+Dependencies with `targets: @all_targets` (like `nerves_pack`) won't compile
+for this target. Fix:
+
+```elixir
+@all_targets [:stm32mp157f_dk2]
+```
+
+### `Nerves.Runtime.KV.get_all()` returns `%{}`
+
+You are running v1.0.0 or v1.1.0 which had a U-Boot environment format bug.
+Upgrade to v1.3.0+ and reflash with `mix burn`.
+
+### Board drops to `STM32MP>` U-Boot prompt instead of booting
+
+You are running v1.0.0, v1.1.0, or v1.2.0 which had missing or broken bootcmd.
+Upgrade to v1.3.0+ and reflash with `mix burn`. To boot manually in the meantime:
+
+```
+sqfsload mmc 0:4 0xc2000000 boot/zImage; sqfsload mmc 0:4 0xc4000000 boot/stm32mp157c-dk2.dtb; setenv bootargs console=ttySTM0,115200 root=/dev/mmcblk0p4 rootfstype=squashfs rootwait loglevel=4; bootz 0xc2000000 - 0xc4000000
+```
+
+### OTA upload fails
+
+Make sure you did the initial flash with `mix burn` (not OTA). The first flash
+must use `mix burn` to write the bootloaders and partition table. After that,
+OTA works for subsequent updates:
+
+```bash
+mix firmware
+mix upload nerves-stm32mp1.local
+```
+
+### `optee: OP-TEE api uid mismatch` in boot log
+
+Harmless. The mainline device tree has an OP-TEE node but this system uses
+sp_min (minimal secure monitor) instead. U-Boot probes for OP-TEE, doesn't
+find it, and moves on. Does not affect operation.
+
+## Display and Scenic UI (v1.4.0+)
+
+The DK2 has a 4-inch 480x800 touchscreen (MIPI DSI, OTM8009A panel, Goodix
+touch controller). Starting with v1.4.0, the base system includes all userspace
+libraries needed for [Scenic](https://github.com/ScenicFramework/scenic) —
+Elixir's native UI framework.
+
+Scenic renders directly to the Linux framebuffer via cairo — no GPU, no window
+manager, no X11/Wayland needed. Software rendering on the dual Cortex-A7 is
+more than enough for dashboards, status displays, and control interfaces.
+
+### Setup
+
+Add to your firmware's `mix.exs` deps:
+
+```elixir
+{:scenic, "~> 0.11"},
+{:scenic_driver_local, "~> 0.11"}
+```
+
+Configure the driver in `config/target.exs`:
+
+```elixir
+config :scenic, :default_driver, Scenic.Driver.Local,
+  width: 480,
+  height: 800,
+  device: "/dev/dri/card0"
+```
+
+### Example scene
+
+```elixir
+defmodule MyFirmware.Scene.Home do
+  use Scenic.Scene
+  import Scenic.Primitives
+
+  @impl true
+  def init(scene, _param, _opts) do
+    graph =
+      Scenic.Graph.build()
+      |> rect({480, 800}, fill: :dark_blue)
+      |> text("Hello from STM32MP1!",
+          font_size: 32,
+          fill: :white,
+          translate: {100, 400})
+
+    {:ok, push_graph(scene, graph)}
+  end
+end
+```
+
+Touch input from the Goodix controller is handled automatically by
+`scenic_driver_local` via Linux evdev (`/dev/input/event*`).
+
 ## Boot Chain
 
 ```
@@ -240,6 +375,12 @@ is documented in a blog series:
 4. [Building the Nerves System](https://github.com/tomazbracic/stm32-moj/blob/main/docs/blog/04-building-the-nerves-system.md)
 5. [From Learning Project to Community System](https://github.com/tomazbracic/stm32-moj/blob/main/docs/blog/05-from-learning-project-to-community-system.md)
 
+## Developing the System
+
+If you want to modify the base system itself (not just build firmware on top of
+it), see [HOW_TO_BUILD.md](HOW_TO_BUILD.md) — it explains the build architecture,
+how to rebuild, and how to publish new releases.
+
 ## Contributing
 
 Contributions are welcome! If you have an STM32MP157F-DK2 (or the C variant —
@@ -248,6 +389,7 @@ they're compatible) and want to help:
 - Report issues with your hardware revision and serial console output
 - Test WiFi, BLE, display, or M4 remoteproc and share results
 - Improve documentation
+- See [HOW_TO_BUILD.md](HOW_TO_BUILD.md) for development setup
 
 ## License
 
